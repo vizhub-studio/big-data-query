@@ -24,10 +24,13 @@ function applyOrderBy(rows: Array<Record<string, unknown>>, orderBy?: { column: 
   return [...rows].sort((a, b) => {
     for (let i = 0; i < cols.length; i++) {
       const col = cols[i];
-      const da = a[col] as any;
-      const db = b[col] as any;
-      if (da === db) continue;
-      return da > db ? dirs[i] : -dirs[i];
+      const valA = a[col];
+      const valB = b[col];
+      if (valA === valB) continue;
+      // Handle comparison - treat nullish values as less than any other value
+      if (valA == null) return -dirs[i];
+      if (valB == null) return dirs[i];
+      return valA > valB ? dirs[i] : -dirs[i];
     }
     return 0;
   });

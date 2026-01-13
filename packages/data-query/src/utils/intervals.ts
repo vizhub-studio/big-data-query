@@ -20,7 +20,9 @@ export function applyBrushedIntervalsToPredicate(
       if (!Number.isFinite(num)) return false;
 
       const [min, max] = normalizeInterval(interval);
-      // Keep consistent with your map.js logic: strict inside interval
+      // Use strict inside interval logic (exclusive bounds):
+      // A value is considered "inside" only if min < value < max
+      // This ensures that exact boundary values are excluded
       if (!(num > min && num < max)) return false;
     }
     return true;
@@ -33,11 +35,13 @@ export function applyFiltersToPredicate(filters: Filter[] | undefined) {
 
     for (const f of filters) {
       if (f.type === "equals") {
-        if ((row as any)[f.column] !== f.value) return false;
+        if (row[f.column] !== f.value) return false;
       } else if (f.type === "in") {
-        if (!f.values.includes((row as any)[f.column] as any)) return false;
+        const rowValue = row[f.column];
+        if (!f.values.includes(rowValue as string | number)) return false;
       } else if (f.type === "timeRange") {
-        const t = new Date((row as any)[f.column] as any).getTime();
+        const rowValue = row[f.column];
+        const t = new Date(rowValue as string | number | Date).getTime();
         if (!Number.isFinite(t)) return false;
         const from = new Date(f.fromISO).getTime();
         const to = new Date(f.toISO).getTime();

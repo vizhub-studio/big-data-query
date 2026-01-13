@@ -10,12 +10,22 @@ import './Demo.css';
 
 const NUM_BINS = 40;
 
+// Store engine globally for throttled requester
+// Note: In a production app, consider using React Context or a state management library
+// to avoid global state. This simplified approach works well for a demo.
+declare global {
+  interface Window {
+    __dataEngine?: CsvEngine;
+  }
+}
+
 // Create throttled requester for histogram queries
 const throttledHistogram = createThrottledRequester<HistogramRequest, HistogramResponse>({
   waitMs: 300,
   key: (req) => `${req.dataset}-${req.xColumn}-${JSON.stringify(req.brushedIntervals)}`,
   request: async (req, signal) => {
-    const engine = (window as any).__dataEngine;
+    const engine = window.__dataEngine;
+    if (!engine) throw new Error('Data engine not initialized');
     return engine.histogram(req, signal);
   }
 });
@@ -43,8 +53,8 @@ export function Demo() {
         const { engine: newEngine, rows } = CsvEngine.fromCsvText(text);
         newEngine.setDataset('counties', rows);
         
-        // Store engine globally for throttled requester
-        (window as any).__dataEngine = newEngine;
+        // Store engine globally for throttled requester (see note at top of file)
+        window.__dataEngine = newEngine;
         
         setEngine(newEngine);
         setLoading(false);
@@ -205,11 +215,11 @@ function HistogramChart({ data, brushed, onBrush }: HistogramChartProps) {
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
 
-  const [domain] = data.domain;
+  const [minDomain, maxDomain] = data.domain;
   const maxCount = Math.max(...data.bins.map(b => b.length), 1);
 
   const xScale = (value: number) => {
-    return ((value - domain) / (data.domain[1] - domain)) * chartWidth;
+    return ((value - minDomain) / (maxDomain - minDomain)) * chartWidth;
   };
 
   const yScale = (count: number) => {
@@ -226,7 +236,7 @@ function HistogramChart({ data, brushed, onBrush }: HistogramChartProps) {
     const x = e.clientX - rect.left - margin.left;
     
     if (x >= 0 && x <= chartWidth) {
-      const value = domain + (x / chartWidth) * (data.domain[1] - domain);
+      const value = minDomain + (x / chartWidth) * (maxDomain - minDomain);
       setIsDragging(true);
       setDragStart(value);
       setDragEnd(value);
@@ -239,7 +249,7 @@ function HistogramChart({ data, brushed, onBrush }: HistogramChartProps) {
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
     const x = Math.max(0, Math.min(chartWidth, e.clientX - rect.left - margin.left));
-    const value = domain + (x / chartWidth) * (data.domain[1] - domain);
+    const value = minDomain + (x / chartWidth) * (maxDomain - minDomain);
     setDragEnd(value);
   };
 
