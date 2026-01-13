@@ -1,3 +1,70 @@
+# Big Data Query Library
+
+This repository contains the `@vizhub/data-query` library - a TypeScript library for querying and filtering data with support for CSV (client-side), DuckDB, and Databricks SQL.
+
+## Project Structure
+
+- **`packages/data-query/`** - The core data query library
+  - CSV engine with full histogram, rows, and aggregate query support
+  - TypeScript types and utilities for data filtering
+  - Comprehensive test suite (24 tests)
+  - See [packages/data-query/README.md](packages/data-query/README.md) for detailed documentation
+
+- **`src/`** - Interactive demo application
+  - React-based demo showing coordinated histograms with brushing
+  - Real-world example of using the library for data visualization
+  - Throttled queries and interactive filtering
+
+## Quick Start
+
+### Running the Demo
+
+```bash
+npm install
+npm run dev
+```
+
+Visit http://localhost:5173/ to see the interactive demo with:
+- Two coordinated histograms (Unemployment Rate and Education Level)
+- Interactive brushing - drag to filter data ranges
+- Real-time filtered data table
+
+### Using the Library
+
+```bash
+cd packages/data-query
+npm install
+npm test  # Run tests
+npm run build  # Build the library
+```
+
+See the [library documentation](packages/data-query/README.md) for API reference and usage examples.
+
+## Features
+
+- **CSV Engine** (fully implemented): Client-side data queries for CSV files
+- **Histogram queries**: Generate binned histograms with configurable bin counts
+- **Row queries**: Filter, sort, and paginate data
+- **Aggregate queries**: Group by columns and compute aggregations
+- **Coordinated brushing**: Multi-dimensional filtering with interval exclusion
+- **Throttled requests**: Built-in request throttling and deduplication
+
+## Development
+
+### Testing
+```bash
+cd packages/data-query
+npm test
+```
+
+### Building
+```bash
+npm run build  # Build the demo app
+cd packages/data-query && npm run build  # Build the library
+```
+
+---
+
 # VizHub Studio Project Repo Template
 
 This repository is an example of the kind of codebase that will be delivered as part of VizHub Studio's Data Visualization Sprint offering.
