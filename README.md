@@ -2,9 +2,11 @@
 
 A TypeScript library for querying and filtering data with support for CSV (client-side), DuckDB, and Databricks SQL. Designed for interactive visualizations with coordinated histograms and brushing.
 
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/0357803e-2518-4f47-bd7a-9349a3f5691f" />
+
 Data structures and API inspired by this earlier crossfiltering example: https://vizhub.com/curran/multidimensional-filtering
 
-**Current status: very early PoC for a concept enabling D3-based front ends with crossfiltering, working with "Big Data" in Parquet or DataBricks. Seeking client projects to validate the usefulness if this. If you're interested, reach out! See https://studio.vizhub.com/ **
+**Current status: very early PoC for a concept enabling D3-based front ends with crossfiltering, working with "Big Data" in Parquet or DataBricks. Seeking client projects to validate the usefulness if this. If you're interested, reach out! See https://studio.vizhub.com/**
 
 ## Features
 
