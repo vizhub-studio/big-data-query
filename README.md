@@ -1,345 +1,318 @@
-# Big Data Query Library
+# @vizhub/big-data-query
 
-**Current status: untested PoC, AI generated code, seeking clients for proving this out in practice - see https://studio.vizhub.com/**
+**Current status: very early PoC for a concept enabling D3-based front ends with crossfiltering, working with "Big Data" in Parquet or DataBricks. Seeking client projects to validate the usefulness if this. If you're interested, reach out! See https://studio.vizhub.com/ **
 
-This repository contains the `@vizhub/data-query` library - a TypeScript library for querying and filtering data with support for CSV (client-side), DuckDB, and Databricks SQL.
-
-## Project Structure
-
-- **`packages/data-query/`** - The core data query library
-  - CSV engine with full histogram, rows, and aggregate query support
-  - TypeScript types and utilities for data filtering
-  - Comprehensive test suite (24 tests)
-  - See [packages/data-query/README.md](packages/data-query/README.md) for detailed documentation
-
-- **`src/`** - Interactive demo application
-  - React-based demo showing coordinated histograms with brushing
-  - Real-world example of using the library for data visualization
-  - Throttled queries and interactive filtering
-
-## Quick Start
-
-### Running the Demo
-
-```bash
-npm install
-npm run dev
-```
-
-Visit http://localhost:5173/ to see the interactive demo with:
-- Two coordinated histograms (Unemployment Rate and Education Level)
-- Interactive brushing - drag to filter data ranges
-- Real-time filtered data table
-
-### Using the Library
-
-```bash
-cd packages/data-query
-npm install
-npm test  # Run tests
-npm run build  # Build the library
-```
-
-See the [library documentation](packages/data-query/README.md) for API reference and usage examples.
+A TypeScript library for querying and filtering data with support for CSV (client-side), DuckDB, and Databricks SQL. Designed for interactive visualizations with coordinated histograms and brushing.
 
 ## Features
 
 - **CSV Engine** (fully implemented): Client-side data queries for CSV files
 - **Histogram queries**: Generate binned histograms with configurable bin counts
 - **Row queries**: Filter, sort, and paginate data
-- **Aggregate queries**: Group by columns and compute aggregations
-- **Coordinated brushing**: Multi-dimensional filtering with interval exclusion
+- **Aggregate queries**: Group by columns and compute aggregations (count, sum, avg, min, max)
+- **Coordinated brushing**: Support for multi-dimensional filtering with interval exclusion
 - **Throttled requests**: Built-in request throttling and deduplication
+- **TypeScript**: Full type safety with TypeScript definitions
 
-## Development
+## Installation
 
-### Testing
+```bash
+npm install @vizhub/data-query
+```
+
+## Quick Start
+
+### Loading CSV Data
+
+```typescript
+import { CsvEngine } from '@vizhub/data-query';
+
+// Load CSV from text
+const csvText = await fetch('/data/mydata.csv').then(r => r.text());
+const { engine, rows } = CsvEngine.fromCsvText(csvText);
+
+// Or create engine and set dataset manually
+const engine = new CsvEngine();
+engine.setDataset('mydata', rows);
+```
+
+### Creating a Histogram
+
+```typescript
+const histogramResponse = await engine.histogram({
+  dataset: 'mydata',
+  xColumn: 'unemployment',
+  numBins: 40,
+  brushedIntervals: {
+    education: [20, 40], // Filter by education range
+  },
+  excludeIntervalsForColumns: ['unemployment'], // Exclude unemployment filter for coordinated view
+});
+
+console.log(histogramResponse.bins); // [{ x0: 0, x1: 1, length: 5 }, ...]
+```
+
+### Querying Rows
+
+```typescript
+const rowsResponse = await engine.rows({
+  dataset: 'mydata',
+  columns: ['id', 'unemployment', 'education'],
+  brushedIntervals: {
+    unemployment: [5, 10],
+    education: [20, 40],
+  },
+  orderBy: [{ column: 'unemployment', dir: 'desc' }],
+  limit: 100,
+  offset: 0,
+});
+
+console.log(rowsResponse.rows); // [{ id: '1', unemployment: 9.5, education: 35 }, ...]
+```
+
+### Computing Aggregates
+
+```typescript
+const aggResponse = await engine.aggregate({
+  dataset: 'mydata',
+  groupBy: ['category'],
+  measures: [
+    { op: 'count', as: 'total' },
+    { op: 'avg', column: 'value', as: 'avg_value' },
+    { op: 'sum', column: 'value', as: 'sum_value' },
+  ],
+  brushedIntervals: {
+    value: [10, 50],
+  },
+});
+
+console.log(aggResponse.rows); // [{ category: 'A', total: 10, avg_value: 30, sum_value: 300 }, ...]
+```
+
+### Throttled Requests
+
+For interactive applications with frequent updates (like brushing), use the throttled requester:
+
+```typescript
+import { createThrottledRequester } from '@vizhub/data-query';
+
+const throttledHistogram = createThrottledRequester({
+  waitMs: 300, // Wait 300ms before executing
+  key: (req) => `${req.dataset}-${req.xColumn}`, // Dedupe key
+  request: async (req, signal) => engine.histogram(req, signal),
+});
+
+// Multiple rapid calls will be debounced and deduplicated
+throttledHistogram({ dataset: 'mydata', xColumn: 'value', numBins: 40 });
+throttledHistogram({ dataset: 'mydata', xColumn: 'value', numBins: 40 });
+// Only one request will be executed after 300ms
+```
+
+## API Reference
+
+### Types
+
+#### `IntervalsByColumn`
+```typescript
+type IntervalsByColumn = Record<string, [number, number] | null>;
+```
+
+Shape for brushed intervals. Matches the UI state shape:
+```typescript
+const brushedIntervals: IntervalsByColumn = {
+  unemployment: [5, 10],
+  education: [20, 40],
+};
+```
+
+#### `HistogramRequest`
+```typescript
+type HistogramRequest = {
+  dataset: string;
+  xColumn: string;
+  numBins: number;
+  brushedIntervals?: IntervalsByColumn;
+  excludeIntervalsForColumns?: string[]; // For coordinated histograms
+  domain?: [number, number]; // Optional: specify domain to avoid computation
+  filters?: Filter[];
+};
+```
+
+#### `HistogramResponse`
+```typescript
+type HistogramResponse = {
+  dataset: string;
+  xColumn: string;
+  domain: [number, number];
+  bins: Array<{ x0: number; x1: number; length: number }>;
+};
+```
+
+#### `RowsRequest`
+```typescript
+type RowsRequest = {
+  dataset: string;
+  columns?: string[];
+  brushedIntervals?: IntervalsByColumn;
+  filters?: Filter[];
+  orderBy?: Array<{ column: string; dir: 'asc' | 'desc' }>;
+  limit?: number;
+  offset?: number;
+};
+```
+
+#### `AggregateRequest`
+```typescript
+type AggregateRequest = {
+  dataset: string;
+  groupBy: string[];
+  measures: Array<{
+    op: 'count' | 'sum' | 'avg' | 'min' | 'max';
+    column?: string;
+    as?: string;
+  }>;
+  brushedIntervals?: IntervalsByColumn;
+  filters?: Filter[];
+  orderBy?: Array<{ column: string; dir: 'asc' | 'desc' }>;
+  limit?: number;
+};
+```
+
+#### Filters
+
+```typescript
+type TimeRangeFilter = {
+  type: 'timeRange';
+  column: string;
+  fromISO: string;
+  toISO: string;
+};
+
+type EqualsFilter = {
+  type: 'equals';
+  column: string;
+  value: string | number | boolean;
+};
+
+type InFilter = {
+  type: 'in';
+  column: string;
+  values: Array<string | number>;
+};
+```
+
+### Engines
+
+#### `CsvEngine`
+
+Client-side CSV data engine.
+
+**Methods:**
+- `static fromCsvText(text: string)`: Parse CSV text and return engine + rows
+- `setDataset(dataset: string, rows: Record<string, unknown>[])`: Register a dataset
+- `histogram(req: HistogramRequest, signal?: AbortSignal): Promise<HistogramResponse>`
+- `rows(req: RowsRequest, signal?: AbortSignal): Promise<RowsResponse>`
+- `aggregate(req: AggregateRequest, signal?: AbortSignal): Promise<AggregateResponse>`
+
+#### `HttpEngine` (stub)
+
+Proxy engine for remote HTTP API.
+
+```typescript
+const engine = new HttpEngine('http://localhost:3000/api/data');
+```
+
+#### `DatabricksSqlEngine` (stub)
+
+Server-side engine for Databricks SQL.
+
+#### `DuckDbEngine` (stub)
+
+Server-side engine for DuckDB.
+
+### Utilities
+
+#### `createThrottledRequester<TArg, TResult>(options)`
+
+Create a throttled and deduplicated request function.
+
+**Options:**
+- `waitMs: number`: Debounce wait time in milliseconds
+- `key: (arg: TArg) => string`: Function to generate deduplication key
+- `request: (arg: TArg, signal: AbortSignal) => Promise<TResult>`: The actual request function
+
+## Testing
+
+The library includes comprehensive unit tests using Vitest:
+
 ```bash
 cd packages/data-query
 npm test
 ```
 
-### Building
-```bash
-npm run build  # Build the demo app
-cd packages/data-query && npm run build  # Build the library
+24 tests covering:
+- CSV parsing
+- Histogram generation with various configurations
+- Row filtering, sorting, and pagination
+- Aggregation operations
+- Filter types (equals, in, timeRange)
+- Brushed intervals and coordinated filtering
+- Error handling
+
+## Architecture
+
+### Coordinated Histograms
+
+The library supports coordinated histograms where filtering one dimension doesn't affect its own histogram:
+
+```typescript
+// When computing unemployment histogram, exclude unemployment filter
+// but apply education filter
+await engine.histogram({
+  dataset: 'mydata',
+  xColumn: 'unemployment',
+  numBins: 40,
+  brushedIntervals: {
+    unemployment: [5, 10],
+    education: [20, 40],
+  },
+  excludeIntervalsForColumns: ['unemployment'], // ← Key feature
+});
 ```
 
----
+This creates the coordinated view pattern where:
+1. User brushes unemployment → filters education histogram and data table
+2. User brushes education → filters unemployment histogram and data table
+3. Both histograms remain interactive and show their full distribution
 
-# VizHub Studio Project Repo Template
+### Brushed Intervals
 
-This repository is an example of the kind of codebase that will be delivered as part of VizHub Studio's Data Visualization Sprint offering.
+The library uses a consistent interval format matching typical UI state:
 
-Key features:
-
- * Vite-based
- * Configures VizHub Studio MCP Server
-
-How it works:
-
- * You create your project in VizHub Studio
- * You get the API key and copy it into this repo's `.env`
- * You start OpenCode from this repo directory
- * That will use the `.env` to set up the VizHub MCP Server
- * Use the AI agent to interact with your VizHub Studio Project
-
-Recommended setup:
-
- * Split screen
- * Left side: OpenCode
- * Right side: VizHub Studio Project Page (updates in real-time)
-
-Primary workflows within AI Agent:
-
- * Request visualization creation (fork and modify with AI)
- * Perform iterative AI edits on existing visualizations
- * Copy files between visualizations
- * Use "@-mentions" to add context (visualizations, data, chat maneuvers from the VizHub Studio playbook)
- * Click AI Edit Review Links from the AI Agent view
-
-Primary workflows within the VizHub Studio Web App:
-
- * Create a Project
-   * Add the initial data files
-   * Add a project description (vision / tasks / goals / communication objectives)
-   * Add brand guidelines
-   * Add reference images
- * Connect to a Project
-   * Each VizHub Studio Project has a corresponding GitHub repository
-   * That GitHub repository is a copy of this template
-   * Simply setting your API key in your `.env` should enable connection to the MCP server
-   * In theory, many MCP hosts can work, but OpenCode is the only tested one so far
- * Navigate to AI Edit Review Links
-   * Choose from 3 options generated by different LLMs
-   * Accept your favorite option to commit to the edit
-   * If no option is acceptable, you can either "Undo", or "Try Harder"
-   * "Try Harder" generates additional options with progressively more powerful LLMs
- * Publish Client Deliverables
-   * Mark specific visualization versions as client deliverables
-   * Copy the project link to share with clients and stakeholders
- * Request an Invitation
-   * When viewing a project link, new users will be required to authenticate
-   * When viewing a project link, logged in users will be prompted to click "Request Invite"
- * Grant an Invitation
-   * After clicking "Request Invite", the invitation request becomes visible to the project owner
-   * The project owner can either accept or deny the invitation request
-   * Upon acceptance, an invite to join the project is emailed to the requester
-   * The requester then clicks through the 
-
-# Environment Variables
-
-Copy `.env.example` to `.env` and configure:
-
-```bash
-cp .env.example .env
+```typescript
+brushedIntervals = {
+  unemployment: [min, max] | null,
+  education: [min, max] | null,
+}
 ```
 
-**Required variables:**
-- `VIZHUB_PROJECT_ID` - Your VizHub Studio project ID (found in project URL)
+Intervals use **strict inside** logic: `value > min && value < max`
 
-**Optional variables:**
-- `VIZHUB_BASE_URL` - VizHub Studio API base URL (defaults to `https://studio.vizhub.com`)
+## Future Work
 
-Example `.env`:
-```
-VIZHUB_PROJECT_ID=my-project-abc123
-VIZHUB_BASE_URL=https://studio.vizhub.com
-```
+### Planned Features
 
-# MCP Tools Reference
+1. **Parquet Support**: Client-side Parquet file reading
+2. **DuckDB Engine**: Complete implementation with WASM support
+3. **Databricks SQL Engine**: Server-side integration
+4. **Express Router**: Ready-to-use Express middleware for HTTP engine
+5. **Streaming**: Support for large datasets with streaming
+6. **Caching**: Intelligent query result caching
 
-The MCP server exposes 6 tools for managing visualizations and project timelines. All tools call the VizHub Studio Timeline Events API and return event links so you can view the results immediately.
+## License
 
-## Tool Overview
+MIT
 
-### 1. Add Visualization from Template
+## Contributing
 
-Create a new visualization from a predefined template.
-
-**Parameters:**
-- `template` (required) - Template type: `scatter-plot`, `line-chart`, `choropleth`, or `bar-chart`
-- `viz_name` (optional) - Display name for the visualization
-- `target_path` (optional) - Path where visualization is created (default: `visualizations/`)
-
-**What it does:**
-- Creates a new visualization in your project from the specified template
-- Emits a `VIZ_ADDED_FROM_TEMPLATE` timeline event
-- Returns an event link for immediate viewing
-
-**Example:**
-```
-Create a scatter plot visualization called "Sales Analysis"
-```
-
-### 2. Fork Visualization
-
-Create a copy of an existing visualization for safe experimentation.
-
-**Parameters:**
-- `source_viz_id` (required) - ID of the visualization to fork
-- `new_name` (optional) - Display name for the forked copy
-
-**What it does:**
-- Creates an independent copy of the visualization
-- Links the fork back to the original in the timeline
-- Emits a `VIZ_FORKED` timeline event
-- Returns an event link
-
-**Example:**
-```
-Fork visualization "viz-abc123" as "Sales Analysis Experiment"
-```
-
-### 3. Copy File into Visualization
-
-Import data or assets from external paths into a visualization.
-
-**Parameters:**
-- `source_path` (required) - Full path to the source file
-- `viz_id` (required) - ID of the target visualization
-- `target_path` (optional) - Path within the viz (default: `data/`)
-- `format_hint` (optional) - File format: `csv` or `json`
-
-**What it does:**
-- Copies a file into the visualization's data directory
-- Records the import in the timeline
-- Emits a `FILE_COPIED_INTO_VIZ` timeline event
-- Returns an event link
-
-**Example:**
-```
-Copy "/data/sales-2024.csv" into visualization "viz-scatter-001" as a CSV file
-```
-
-### 4. Request AI Edit
-
-Request AI-powered modifications to a visualization.
-
-**Parameters:**
-- `viz_id` (required) - ID of the visualization to edit
-- `instruction` (required) - Natural language description of desired changes
-- `scope` (optional) - Scope of changes: `visual`, `data`, `interaction`, or `refactor` (default: `visual`)
-- `files` (optional) - Specific files to modify within the visualization
-
-**What it does:**
-- Submits an edit request to the AI system
-- Emits an `AI_EDIT_REQUESTED` timeline event
-- VizHub backend processes the request asynchronously
-- Returns an event link with request details
-
-**Example:**
-```
-For visualization "viz-scatter-001", change the color scheme to use brand colors (visual scope)
-```
-
-### 5. Rename Visualization
-
-Update the display name of a visualization.
-
-**Parameters:**
-- `viz_id` (required) - ID of the visualization to rename
-- `new_name` (required) - New display name
-
-**What it does:**
-- Updates the visualization's name in the project
-- Emits a `VIZ_RENAMED` timeline event
-- Returns an event link
-
-**Example:**
-```
-Rename visualization "viz-scatter-001" to "Q4 Sales Analysis"
-```
-
-### 6. Add Project Note
-
-Add a narrative entry to the project timeline for decisions, notes, or observations.
-
-**Parameters:**
-- `message` (required) - The note content
-- `related_viz_id` (optional) - Link the note to a specific visualization
-
-**What it does:**
-- Creates a `PROJECT_NOTE_ADDED` timeline event
-- Builds a narrative history of decisions and discussions
-- Optionally associates the note with a visualization
-- Returns an event link
-
-**Example:**
-```
-Add note: "Need to validate data with stakeholders before final export" related to viz-scatter-001
-```
-
-## API Integration Details
-
-### How It Works
-
-1. All MCP tools make HTTP POST requests to the VizHub Studio Timeline Events API
-2. The MCP server reads `VIZHUB_PROJECT_ID` from environment variables
-3. Base URL comes from `VIZHUB_BASE_URL` (defaults to `https://studio.vizhub.com`)
-4. Each tool call creates exactly one timeline event
-5. Event links are returned in the format: `https://studio.vizhub.com/projects/:projectId/:eventId`
-
-### Request Flow
-
-```
-OpenCode AI Agent
-    ↓ (calls MCP tool)
-MCP Server (vizhub-mcp/server.mjs)
-    ↓ (fetch POST to)
-VizHub Studio API (studio.vizhub.com/api/timeline-events/*)
-    ↓ (creates event)
-VizHub Project Timeline
-```
-
-### Response Format
-
-All tools return:
-- ✅ Success toast with confirmation message
-- 🔗 Event link to view in VizHub Studio
-- ❌ Error message if the API call fails
-
-### Error Handling
-
-If a tool fails:
-- Network errors are caught and reported with details
-- API errors from VizHub are wrapped in the response
-- Error messages are displayed in the AI agent
-- All failures are logged to console for debugging
-
-## Example Workflow
-
-A typical workflow using these tools:
-
-```
-1. Create a new scatter plot visualization
-   → "Create visualization called 'Sales Analysis' from scatter-plot template"
-
-2. Copy data into it
-   → "Copy /data/sales-2024.csv into viz with format hint csv"
-
-3. Request styling improvements
-   → "For the visualization, change colors to use our brand palette (visual)"
-
-4. Add a project note
-   → "Note: Data validated with marketing team on 2024-12-20"
-
-5. View results
-   → All event links appear in timeline at studio.vizhub.com
-```
-
-## Debugging
-
-The MCP server logs all API calls to console:
-
-```
-[API Call] POST https://studio.vizhub.com/api/timeline-events/add-viz-from-template
-[API Payload] { projectId: "...", template: "scatter-plot", ... }
-[API Success] Event ID: project-abc123-event-1
-```
-
-Monitor these logs to verify:
-- Correct project ID is being used
-- API endpoints are accessible
-- Requests are formatted correctly
-- Events are being created successfully
+See the main repository for contribution guidelines.
