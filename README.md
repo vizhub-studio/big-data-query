@@ -1,8 +1,10 @@
 # @vizhub/big-data-query
 
-**Current status: very early PoC for a concept enabling D3-based front ends with crossfiltering, working with "Big Data" in Parquet or DataBricks. Seeking client projects to validate the usefulness if this. If you're interested, reach out! See https://studio.vizhub.com/ **
-
 A TypeScript library for querying and filtering data with support for CSV (client-side), DuckDB, and Databricks SQL. Designed for interactive visualizations with coordinated histograms and brushing.
+
+Data structures and API inspired by this earlier crossfiltering example: https://vizhub.com/curran/multidimensional-filtering
+
+**Current status: very early PoC for a concept enabling D3-based front ends with crossfiltering, working with "Big Data" in Parquet or DataBricks. Seeking client projects to validate the usefulness if this. If you're interested, reach out! See https://studio.vizhub.com/ **
 
 ## Features
 
