@@ -1,5 +1,7 @@
 # Big Data Query Library
 
+**Current status: untested PoC, AI generated code, seeking clients for proving this out in practice - see https://studio.vizhub.com/**
+
 This repository contains the `@vizhub/data-query` library - a TypeScript library for querying and filtering data with support for CSV (client-side), DuckDB, and Databricks SQL.
 
 ## Project Structure
