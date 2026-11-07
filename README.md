@@ -8,6 +8,20 @@ Data structures and API inspired by this earlier crossfiltering example: https:/
 
 **Current status: very early PoC for a concept enabling D3-based front ends with crossfiltering, working with "Big Data" in Parquet or DataBricks. Seeking client projects to validate the usefulness if this. If you're interested, reach out! See https://studio.vizhub.com/**
 
+## Proof-of-concept status and development
+
+This repository is an **early proof of concept**, not a production data gateway. The source separates [query engines](src/engines/), [server integration](src/server/), and [public types](src/types.ts). Backend credentials, query permissions, large result sets, and data transport security are the **embedding application's** responsibility.
+
+The checked-in build and verification scripts are:
+
+```bash
+npm ci
+npm test
+npm run build
+```
+
+Package scripts do not provide a `dev` or production deployment command. Example connections to DuckDB or Databricks should be assessed against their concrete engine implementation before assuming that every adapter or feature is fully supported. Avoid placing connection secrets in browser bundles or committed examples.
+
 ## Features
 
 - **CSV Engine** (fully implemented): Client-side data queries for CSV files
